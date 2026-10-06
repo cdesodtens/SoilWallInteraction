@@ -3,7 +3,7 @@
 ![image](images/image_1.png)
 
 ## À propos de ce projet
-Ce simulateur a été fortement modifié et adapté par **Clément Desodt** (ENS Paris-Saclay, Département Génie Civil et Environnement) pour des applications spécifiques d'interaction sol-mur de soutènement (modélisation de poussée/butée, adaptation de la physique, système de sauvegarde/chargement des états, etc.).
+Ce simulateur a été modifié et adapté par **Clément Desodt** (ENS Paris-Saclay, Département Génie Civil et Environnement) pour des applications spécifiques d'interaction sol-mur de soutènement (modélisation de poussée/butée, adaptation de la physique, système de sauvegarde/chargement des états, etc.).
 
 ## Remerciements / Crédits
 Ce projet est basé sur le code original [VerletSFML-Multithread](https://github.com/johnBuffer/VerletSFML-Multithread) développé par John Buffer (Jean Tampon). 
