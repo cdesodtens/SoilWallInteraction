@@ -2,6 +2,10 @@
 
 ![image](images/image_1.png)
 
+## Remerciements / Crédits
+Ce projet est basé sur le code original [VerletSFML-Multithread](https://github.com/johnBuffer/VerletSFML-Multithread) développé par John Buffer (Jean Tampon). 
+Le code original est distribué sous la [licence MIT](LICENSE), qui autorise la modification et la redistribution sous réserve d'inclure la notice de copyright d'origine.
+
 ## Compilation
 
 [SFML](https://www.sfml-dev.org/) and [CMake](https://cmake.org/) need to be installed.
