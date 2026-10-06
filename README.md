@@ -1,13 +1,13 @@
 # Verlet Multi thread
 
-![image](images/image_1.png)
+![image](images/image_2.png)
 
 ## À propos de ce projet
 Ce simulateur a été modifié et adapté par **Clément Desodt** (ENS Paris-Saclay, Département Génie Civil et Environnement) pour des applications spécifiques d'interaction sol-mur de soutènement (modélisation de poussée/butée, adaptation de la physique, système de sauvegarde/chargement des états, etc.).
 
 ## Remerciements / Crédits
 Ce projet est basé sur le code original [VerletSFML-Multithread](https://github.com/johnBuffer/VerletSFML-Multithread) développé par John Buffer (Jean Tampon). 
-Le code original est distribué sous la [licence MIT](LICENSE), qui autorise la modification et la redistribution sous réserve d'inclure la notice de copyright d'origine. Les modifications apportées par Clément Desodt sont également distribuées sous la même licence MIT.
+Le code original est distribué sous la [licence MIT](LICENSE), qui autorise la modification et la redistribution sous réserve d'inclure la notice de copyright d'origine. Les modifications apportées par sont également distribuées sous la même licence MIT.
 
 ## Compilation
 
