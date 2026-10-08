@@ -37,3 +37,7 @@ build*/
 Cmake-build-*/base_state.bin
 *.webm
 *.mp4
+
+# Documentation
+/documentation/*
+!/documentation/*.pdf

@@ -16,9 +16,16 @@ struct PhysicSolver
     float                  wallPosition = 100.0f; // Position du mur
     float                  roof_y = 180.0f;       // Position du toit
     
+    // Paramètres de fondation
+    bool                   use_foundation = false;
+    float                  foundation_x_min = 0.0f;
+    float                  foundation_x_max = 0.0f;
+    float                  foundation_y = 0.0f;
+
     // Paramètres physiques
     float                  velocity_damping = 40.0f; // Amortissement de l'air
     float                  response_coef = 1.0f;     // Coefficient de rebond/réponse
+    float                  friction_coef = 0.3f;     // Frottement particulaire (acier-acier)
 
     // Simulation solving pass count
     uint32_t        sub_steps;
@@ -26,7 +33,7 @@ struct PhysicSolver
 
     PhysicSolver(IVec2 size, float cell_size_, tp::ThreadPool& tp)
         : cell_size{cell_size_}
-        , grid{static_cast<int32_t>(size.x / cell_size_) + 1, static_cast<int32_t>(size.y / cell_size_) + 1}
+        , grid{static_cast<int32_t>(size.x / cell_size_) + 3, static_cast<int32_t>(size.y / cell_size_) + 3}
         , world_size{to<float>(size.x), to<float>(size.y)}
         , sub_steps{8}
         , thread_pool{tp}
@@ -51,9 +58,34 @@ struct PhysicSolver
             const float mass_ratio_1 = m1 / (m1 + m2);
             const float mass_ratio_2 = m2 / (m1 + m2);
             const float delta  = response_coef * (min_dist - dist);
-            const Vec2 col_vec = (o2_o1 / dist) * delta;
+            Vec2 n = o2_o1 / dist;
+            const Vec2 col_vec = n * delta;
+            
             obj_1.position += col_vec * mass_ratio_2;
             obj_2.position -= col_vec * mass_ratio_1;
+            
+            // --- Frottement Tangentiel (Coulomb) ---
+            if (friction_coef > 0.0f) {
+                Vec2 v1 = obj_1.position - obj_1.last_position;
+                Vec2 v2 = obj_2.position - obj_2.last_position;
+                Vec2 v_rel = v1 - v2;
+                
+                float vn = v_rel.x * n.x + v_rel.y * n.y;
+                Vec2 v_tan = {v_rel.x - n.x * vn, v_rel.y - n.y * vn};
+                
+                float v_tan_len = sqrt(v_tan.x * v_tan.x + v_tan.y * v_tan.y);
+                if (v_tan_len > 0.0001f) {
+                    // Limite de Coulomb : mu * impulsion_normale (représentée par delta)
+                    float friction_disp = friction_coef * delta;
+                    
+                    float apply_tan = std::min(friction_disp, v_tan_len);
+                    Vec2 tan_vec = { (v_tan.x / v_tan_len) * apply_tan, (v_tan.y / v_tan_len) * apply_tan };
+                    
+                    // On modifie last_position pour appliquer le changement de vitesse
+                    obj_1.last_position += tan_vec * mass_ratio_2;
+                    obj_2.last_position -= tan_vec * mass_ratio_1;
+                }
+            }
         }
     }
 
@@ -149,12 +181,13 @@ struct PhysicSolver
     void addObjectsToGrid()
     {
         grid.clear();
-        // Safety border to avoid adding object outside the grid
         uint32_t i{0};
         for (const PhysicObject& obj : objects.data) {
-            if (obj.position.x > 1.0f && obj.position.x < world_size.x - 1.0f &&
-                obj.position.y > 1.0f && obj.position.y < world_size.y - 1.0f) {
-                grid.addAtom(to<int32_t>(obj.position.x / cell_size), to<int32_t>(obj.position.y / cell_size), i);
+            int32_t cell_x = to<int32_t>(obj.position.x / cell_size) + 1;
+            int32_t cell_y = to<int32_t>(obj.position.y / cell_size) + 1;
+            if (cell_x >= 1 && cell_x < grid.width - 1 &&
+                cell_y >= 1 && cell_y < grid.height - 1) {
+                grid.addAtom(cell_x, cell_y, i);
             }
             ++i;
         }
@@ -172,36 +205,82 @@ struct PhysicSolver
                 obj.update(dt, velocity_damping);
                 
                 // Apply map borders collisions
-                const float margin = 5.0f;
-                if (obj.position.x > world_size.x - margin) {
-                    obj.position.x = world_size.x - margin;
-                    obj.position.y = oldposition.y;
-                } 
-                // else if (obj.position.x < margin) {
-                //     obj.position.x = margin;
-                // }
-                if (obj.position.y > world_size.y - margin) {
-                    obj.position.y = world_size.y - margin;
-                    obj.position.x = oldposition.x;
-                } 
-                // else if (obj.position.y < margin) {
-                //     obj.position.y = margin;
-                // }
+                const float margin_x = obj.radius; 
+                const float margin_y = obj.radius; 
+                if (obj.position.x > world_size.x - margin_x) {
+                    obj.position.x = world_size.x - margin_x;
+                } else if (obj.position.x < margin_x) {
+                    obj.position.x = margin_x;
+                }
+                
+                if (obj.position.y > world_size.y - margin_y) {
+                    obj.position.y = world_size.y - margin_y;
+                    // On conserve la friction au sol pour l'empilement (optionnel mais utile ici)
+                    obj.position.x = oldposition.x; 
+                } else if (obj.position.y < margin_y) {
+                    obj.position.y = margin_y;
+                }
 
                 // Add wall collisions
-
                 if (obj.position.x < wallPosition) {
                     obj.position.x = wallPosition; 
+                    // MUR RUGUEUX : on bloque le mouvement vertical relatif
+                    obj.position.y = oldposition.y;
                 }
-                // Add roof collisions
 
+                // Add roof collisions
                 if (obj.position.y < roof_y ) {
                     obj.position.y = roof_y;
-                    
-                    
                 }
 
-                // obj.color = ColorUtils::getRainbow(obj.position.x * 0.01f);
+                // Add foundation collisions
+                if (use_foundation) {
+                    // La fondation est un bloc allant de y=0 à y=foundation_y
+                    // et de x=foundation_x_min à x=foundation_x_max.
+                    float clamp_x = std::max(foundation_x_min, std::min(obj.position.x, foundation_x_max));
+                    float clamp_y = std::max(0.0f, std::min(obj.position.y, foundation_y));
+                    
+                    float dx = obj.position.x - clamp_x;
+                    float dy = obj.position.y - clamp_y;
+                    
+                    float dist2 = dx*dx + dy*dy;
+                    if (dist2 < obj.radius * obj.radius) {
+                        float dist = std::sqrt(dist2);
+                        if (dist > 0.0001f) {
+                            float overlap = obj.radius - dist;
+                            float nx = dx / dist;
+                            float ny = dy / dist;
+                            obj.position.x += nx * overlap;
+                            obj.position.y += ny * overlap;
+                            
+                            // FONDATION RUGUEUSE :
+                            // Si la particule est sous la fondation (normale vers le bas)
+                            if (ny > 0.707f) {
+                                // On bloque le mouvement horizontal relatif (friction infinie)
+                                obj.position.x = oldposition.x;
+                            }
+                            
+                        } else {
+                            // Si le centre de la particule est à l'intérieur de la fondation
+                            float push_down = foundation_y - obj.position.y;
+                            float push_left = obj.position.x - foundation_x_min;
+                            float push_right = foundation_x_max - obj.position.x;
+                            
+                            if (push_down < push_left && push_down < push_right) {
+                                obj.position.y = foundation_y + obj.radius;
+                                // FONDATION RUGUEUSE : Bloquer mouvement horizontal
+                                obj.position.x = oldposition.x;
+                            } else if (push_left < push_right) {
+                                obj.position.x = foundation_x_min - obj.radius;
+                            } else {
+                                obj.position.x = foundation_x_max + obj.radius;
+                            }
+                        }
+                    }
+                }
+
+                float displacement = MathVec2::length(obj.position - obj.reference_position);
+                obj.color = ColorUtils::getRainbow(displacement * 0.2f);
 
             }
         });

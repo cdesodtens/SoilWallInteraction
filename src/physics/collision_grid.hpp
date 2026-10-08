@@ -6,7 +6,7 @@
 
 struct CollisionCell
 {
-    static constexpr uint8_t cell_capacity = 16;
+    static constexpr uint8_t cell_capacity = 32;
     static constexpr uint8_t max_cell_idx  = cell_capacity - 1;
 
     // Overlap workaround

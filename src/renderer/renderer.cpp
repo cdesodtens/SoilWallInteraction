@@ -25,6 +25,26 @@ void Renderer::render(RenderContext& context)
     // Particles
     updateParticlesVA();
     context.draw(objects_va, states);
+
+    // Draw wall (left boundary block)
+    sf::RectangleShape wallRect({solver.wallPosition, solver.world_size.y});
+    wallRect.setPosition(0.0f, 0.0f);
+    wallRect.setFillColor(sf::Color(80, 80, 80, 150)); // Semi-transparent dark grey
+    context.draw(wallRect);
+
+    // Draw roof (top boundary block)
+    sf::RectangleShape roofRect({solver.world_size.x, solver.roof_y});
+    roofRect.setPosition(0.0f, 0.0f);
+    roofRect.setFillColor(sf::Color(80, 80, 80, 150));
+    context.draw(roofRect);
+
+    // Draw foundation
+    if (solver.use_foundation) {
+        sf::RectangleShape foundRect({solver.foundation_x_max - solver.foundation_x_min, solver.foundation_y});
+        foundRect.setPosition(solver.foundation_x_min, 0.0f);
+        foundRect.setFillColor(sf::Color(150, 75, 0, 200)); // Brown
+        context.draw(foundRect);
+    }
 }
 
 void Renderer::initializeWorldVA()

@@ -43,40 +43,46 @@ int main()
     const uint32_t window_height = 1000;
 
     // Dimensions de l'espace de simulation physique (unités arbitraires)
-    const IVec2 simulation_size{960, 540};
+    const IVec2 simulation_size{460, 540};
 
     // Configuration des particules
-    const uint32_t nbObjects = 10000;
-    const uint32_t particles_spawn_per_frame = 50; // Plus ce chiffre est grand, plus le remplissage est rapide
-    const float particle_radius_min = 0.4f;
-    const float particle_radius_max = 1.4f;
-    const float stabilization_time = 10.0f; // Temps de stabilisation après l'émission des particules (secondes)
+    const uint32_t nbObjects = 9000;
+    const uint32_t particles_spawn_per_frame = 50; 
+    const float particle_radius_min = 0.2f; 
+    const float particle_radius_max = 3.f; 
+    const float stabilization_time = 10.0f; 
 
-    // Configuration de l'environnement (mur et toit)
-    const float wall_start_position = 700.0f; // Mur à 1/4 de la largeur)
-    const float wall_speed = 0.08f;           // Vitesse de déplacement du mur
-    const float roof_y = 180.0f;              // Position verticale du toit
+    // Configuration de l'environnement
+    const float wall_start_position = 0.0f; 
+    const float roof_y = 180.0f;              
+
+    // Configuration de la fondation
+    const float foundation_width = 120.0f;
+    const float foundation_start_y = 270.0f; 
+    const float foundation_speed = 0.15f;     
 
     // Configuration de la physique
-    const float physics_gravity = 50.0f;      // Force de gravité
-    const float physics_damping = 40.0f;      // Amortissement (friction de l'air)
-    const float physics_response_coef = 1.0f; // Coefficient de rebond/réponse des collisions
-    const float grid_cell_size = 4.0f;        // Taille des cellules de la grille de collision
+    const float physics_gravity = 50.f;      
+    const float physics_damping = 40.0f;      
+    const float physics_response_coef = 1.0f; 
+    const float physics_friction_coef = 0.3f; // Frottement inter-particulaire (0.0 lisse, >0 rugueux)
+    const uint32_t physics_sub_steps = 16;     // Precision du solveur (plus c'est eleve, plus le sol est rigide/dilatant)
+    const float grid_cell_size = 8.0f; 
 
     // Position du point d'apparition (robinet)
-    // On veut tomber au milieu de la zone disponible entre le mur et le bord droit
-    const float spawn_x = wall_start_position + (simulation_size.x - wall_start_position) / 2.0f;
-    const float spawn_y = roof_y + 80.0f; // Juste sous le toit
+    // On tombe au milieu
+    const float spawn_x = simulation_size.x / 2.0f;
+    const float spawn_y = roof_y + 10.0f; // Juste sous le toit
 
     // Fichier de sauvegarde de l'état
-    const std::string save_filename = "base_state.bin";
+    const std::string save_filename = "foundation_state.bin";
     const bool use_save_file = true;
 
     // ==========================================
     // INITIALISATION DU MOTEUR
     // ==========================================
 
-    WindowContextHandler app("Verlet-MultiThread", sf::Vector2u(window_width, window_height), sf::Style::Default);
+    WindowContextHandler app("Verlet-MultiThread - Fondation", sf::Vector2u(window_width, window_height), sf::Style::Default);
     RenderContext &render_context = app.getRenderContext();
 
     tp::ThreadPool thread_pool(10);
@@ -86,6 +92,14 @@ int main()
     solver.gravity = {0.0f, physics_gravity};
     solver.velocity_damping = physics_damping;
     solver.response_coef = physics_response_coef;
+    solver.friction_coef = physics_friction_coef;
+    solver.sub_steps = physics_sub_steps;
+    
+    // Initialisation de la fondation (désactivée pendant le remplissage)
+    solver.use_foundation = false;
+    solver.foundation_x_min = (simulation_size.x - foundation_width) / 2.0f;
+    solver.foundation_x_max = (simulation_size.x + foundation_width) / 2.0f;
+    solver.foundation_y = foundation_start_y;
 
     Renderer renderer(solver, thread_pool);
 
@@ -130,8 +144,8 @@ int main()
 
                     const float random_radius = RNGf::getRange(particle_radius_min, particle_radius_max);
                     
-                    float final_spawn_x = spawn_x + RNGf::getRange(-1.5f, 1.5f);
-                    float final_spawn_y = spawn_y + RNGf::getRange(-1.5f, 1.5f);
+                    float final_spawn_x = RNGf::getRange(20.0f, simulation_size.x - 20.0f);
+                    float final_spawn_y = spawn_y + RNGf::getRange(-5.0f, 5.0f);
 
                     const auto id = solver.createObject({final_spawn_x, final_spawn_y}, random_radius);
                     
@@ -173,16 +187,28 @@ int main()
         }
     }
 
-    // DEPLACEMENT DU MUR
+    // ACTIVATION DE LA FONDATION APRES REMPLISSAGE
+    solver.use_foundation = true;
     
-    // Vitesse de déplacement du mur (par frame)
-    // En positif : vers la droite, en négatif : vers la gauche
-    
+    // Placer la fondation juste au-dessus des particules sous son emprise
+    float highest_y = static_cast<float>(simulation_size.y);
+    for (const auto& obj : solver.objects.data) {
+        if (obj.position.x >= solver.foundation_x_min && obj.position.x <= solver.foundation_x_max) {
+            float top_y = obj.position.y - obj.radius;
+            if (top_y < highest_y) {
+                highest_y = top_y;
+            }
+        }
+    }
+    if (highest_y < simulation_size.y) {
+        solver.foundation_y = highest_y - 1.0f; // On la place juste au-dessus
+    }
 
+    // DEPLACEMENT DE LA FONDATION
     while (app.run())
     {
         time += dt;
-        solver.wallPosition += wall_speed; 
+        solver.foundation_y += foundation_speed; // La fondation descend
         solver.update(dt);
         render_context.clear();
         renderer.render(render_context);
